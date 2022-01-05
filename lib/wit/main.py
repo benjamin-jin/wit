@@ -34,7 +34,18 @@ log = getLogger()
 
 class NotAPackageError(WitUserError):
     pass
+class NoSuchMethod(Exception):
+  def __init__(self, command):
+    self.command = command
+  def __str__(self) -> str:
+      return f"No such Method as {self.command}"
 
+def get_command(command):
+  command = command.replace("-","_")
+  if hasattr(sys.modules[__name__], command):
+    return getattr(sys.modules[__name__], command.replace("-","_"))
+  else:
+    raise NoSuchMethod(command)
 
 def main() -> None:
 
@@ -67,50 +78,17 @@ def main() -> None:
         sys.exit(0)
 
     try:
-        # FIXME: This big switch statement... no good.
-        if args.command == 'init':
-            create(args)
-        elif args.command == 'restore':
-            restore_from_lock(args)
-
+        lst_workspace_not_needed = ["init", "restore"]
+        if args.command in lst_workspace_not_needed:
+          get_command(args.command)(args)
         else:
-            # These commands assume the workspace already exists. Error out if the
-            # workspace cannot be found.
             try:
                 ws = WorkSpace.find(Path.cwd(), parse_repo_path(args), args.jobs)
-
             except FileNotFoundError as e:
                 log.error("Unable to find workspace root [{}]. Cannot continue.".format(e))
                 sys.exit(1)
+            get_command(args.command)(ws, args)
 
-            if args.command == 'add-pkg':
-                add_pkg(ws, args)
-
-            elif args.command == 'update-pkg':
-                update_pkg(ws, args)
-
-            elif args.command == 'add-dep':
-                add_dep(ws, args)
-
-            elif args.command == 'update-dep':
-                update_dep(ws, args)
-
-            elif args.command == 'status':
-                status(ws, args)
-
-            elif args.command == 'update':
-                update(ws, args)
-
-            elif args.command == 'foreach':
-                foreach(ws, args)
-
-            elif args.command == 'inspect':
-                if args.dot or args.tree:
-                    inspect_tree(ws, args)
-                else:
-                    log.error('`wit inspect` must be run with a flag')
-                    print(parser.parse_args('inspect -h'.split()))
-                    sys.exit(1)
     except WitUserError as e:
         error(e)
     except AssertionError as e:
@@ -148,7 +126,7 @@ def parse_repo_path(args):
     return args.repo_path.split(' ') if args.repo_path else []
 
 
-def create(args) -> None:
+def init(args) -> None:
     if args.add_pkg is None:
         dependencies = []  # type: List[Tuple[str, str]]
     else:
@@ -165,7 +143,7 @@ def create(args) -> None:
 # A user can restore a workspace in the current directory, or in a new directory.
 # A wit-lock.json and wit-workspace.json needs to be found either in the current directory
 # or separately specified by arguments.
-def restore_from_lock(args) -> None:
+def restore(args) -> None:
     current_dir = Path.cwd()
     lock_dir = current_dir
     dest_ws = current_dir
@@ -204,7 +182,13 @@ def restore_from_lock(args) -> None:
 
     WorkSpace.restore(dest_ws)
 
-
+def inspect(ws, args) -> None:
+    if args.dot or args.tree:
+        inspect_tree(ws, args)
+    else:
+        log.error('`wit inspect` must be run with a flag')
+        print(parser.parse_args('inspect -h'.split()))
+        sys.exit(1)
 def add_pkg(ws, args) -> None:
     log.info("Adding package to workspace")
     ws.add_dependency(args.repo)
@@ -399,7 +383,6 @@ def update(ws, args) -> None:
     else:
         print_errors(errors)
         sys.exit(1)
-
 
 def version() -> None:
     version = get_git_version()
