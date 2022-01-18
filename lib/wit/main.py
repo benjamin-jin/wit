@@ -41,145 +41,17 @@ class NoSuchMethod(Exception):
   def __init__(self, command):
     self.command = command
   def __str__(self) -> str:
-      return f"No such Method as {self.command}"
+      return f"No such Method as {self.command}or command_{self.command}"
 
 def get_command(command):
   command = command.replace("-","_")
   if hasattr(sys.modules[__name__], command):
-    return getattr(sys.modules[__name__], command.replace("-","_"))
+    return getattr(sys.modules[__name__], command)
+  elif hasattr(sys.modules[__name__], "command_" + command):
+    return getattr(sys.modules[__name__], "command_" + command)
   else:
-      return test_command
-    # raise NoSuchMethod(command)
+    raise NoSuchMethod(command)
 
-def test_command(orgWs, args):
-    orignalLevel = log.getLevelName()
-    log.setLevel(logging.CRITICAL)
-    subprocess.run(["rm", "-rf", ".temp"], stdout=subprocess.DEVNULL)
-    ws = WorkSpace.create(".temp", parse_repo_path(args), args.jobs)
-    dependencies = [] if args.source_pkg is None else args.source_pkg
-    names = [ each.split("/")[-1].replace(".git","") for (each, _) in dependencies]
-    print(names)
-    for dep in dependencies:
-        print(dep)
-        ws.add_dependency(dep)
-        # print(dep)
-    print(ws)
-    log.setLevel(orignalLevel)
-    packages, errors = ws.resolve(download=True)
-    if len(errors) != 0:
-        print_errors(errors)
-        sys.exit(1)
-    argsDict = vars(args)
-
-    cwd = Path(os.getcwd()).resolve()
-    manifest_path = cwd/GitRepo.PKG_DEPENDENCY_FILE
-    print(manifest_path)
-    if manifest_path.exists():
-        manifest = Manifest.read_manifest(manifest_path)
-    else:
-        manifest = Manifest([])
-
-    # make sure the dependency is not already in the cwd's manifest
-
-
-    for (key, value) in packages.items():
-        if key in names and not args.include_repo:
-            continue
-        argsDict["pkg"] = (value.source, value.revision)
-        argsDict["message"] = None
-        namespace = Namespace(**argsDict)
-        print(manifest.contains_dependency(key))
-        if manifest.contains_dependency(key):
-            update_dep(orgWs, namespace)
-        else:
-            # print(key)
-            add_dep(orgWs, namespace)
-        # add_dep(orgWs, (value.source, value.revision), args.target_package, args.overwrite)
-    # print(args)
-# def add_dep_import(ws, args, td, overwrite):
-#     # print(args)
-#     """ Resolve a Dependency then add it to the cwd's wit-manifest.json """
-#     packages = {pkg.name: pkg for pkg in ws.lock.packages}
-#     req_dep = dependency_from_tag(ws.root, args)
-
-#     cwd = Path(os.path.join(os.getcwd(),  td)).resolve()
-#     if cwd == ws.root:
-#         error("add-dep must be run inside of a package, not the workspace root.\n\n" +
-#               add_dep_parser.format_help())
-#     cwd_dirname = cwd.relative_to(ws.root).parts[0]
-#     if not ws.lock.contains_package(cwd_dirname):
-#         raise NotAPackageError(
-#             "'{}' is not a package in workspace at '{}'".format(cwd_dirname, ws.path))
-
-#     # in order to resolve the revision, we need to bind
-#     # the req_dep to disk, cloning into .wit if neccesary
-#     req_dep.load(packages, ws.repo_paths, ws.root, True)
-#     try:
-#         req_dep.package.revision = req_dep.resolved_rev()
-#     except GitCommitNotFound:
-#         raise WitUserError("Could not find commit or reference '{}' in '{}'"
-#                            "".format(req_dep.specified_revision, req_dep.name))
-
-#     check_submodule_only(cwd)
-
-#     manifest_path = cwd/GitRepo.PKG_DEPENDENCY_FILE
-#     if manifest_path.exists():
-#         manifest = Manifest.read_manifest(manifest_path)
-#     else:
-#         manifest = Manifest([])
-
-#     # make sure the dependency is not already in the cwd's manifest
-#     if manifest.contains_dependency(req_dep.name):
-#         if not overwrite:
-#             log.error("'{}' already depends on '{}'".format(cwd_dirname, req_dep.name))
-#             sys.exit(1)
-#         else:
-
-#     manifest.add_dependency(req_dep)
-#     manifest.write(manifest_path)
-
-#     log.info("'{}' now depends on '{}'".format(cwd_dirname, req_dep.package.id()))
-
-
-# def update_dep(ws, args) -> None:
-#     packages = {pkg.name: pkg for pkg in ws.lock.packages}
-#     req_dep = dependency_from_tag(ws.root, args.pkg, message=args.message)
-
-#     cwd = Path(os.getcwd()).resolve()
-
-#     if cwd == ws.root:
-#         error("update-dep must be run inside of a package, not the workspace root.\n"
-#               "  A dependency is updated in the package determined by the current working "
-#               "directory,\n  which can also be set by -C.")
-
-#     cwd_dirname = cwd.relative_to(ws.root).parts[0]
-
-#     check_submodule_only(cwd)
-#     manifest = Manifest.read_manifest(cwd/GitRepo.PKG_DEPENDENCY_FILE)
-
-#     # make sure the package is already in the cwd's manifest
-#     if not manifest.contains_dependency(req_dep.name):
-#         log.error("'{}' does not depend on '{}'".format(cwd_dirname, req_dep.name))
-#         sys.exit(1)
-
-#     req_dep.load(packages, ws.repo_paths, ws.root, True)
-#     req_pkg = req_dep.package
-#     try:
-#         req_pkg.revision = req_dep.resolved_rev()
-#     except GitCommitNotFound:
-#         raise WitUserError("Could not find commit or reference '{}' in '{}'"
-#                            "".format(req_dep.specified_revision, req_dep.name))
-
-#     # check if the requested repo is missing from disk
-#     if req_pkg.repo is None:
-#         msg = "'{}' not found in workspace. Have you run 'wit update'?".format(req_dep.name)
-#         raise PackageNotInWorkspaceError(msg)
-
-#     log.info("Updating to {}".format(req_dep.resolved_rev()))
-#     manifest.replace_dependency(req_dep)
-#     manifest.write(cwd/GitRepo.PKG_DEPENDENCY_FILE)
-
-#     log.info("'{}' now depends on '{}'".format(cwd_dirname, req_pkg.id()))
 
 
 def main() -> None:
@@ -324,7 +196,7 @@ def inspect(ws, args) -> None:
         log.error('`wit inspect` must be run with a flag')
         print(parser.parse_args('inspect -h'.split()))
         sys.exit(1)
-def add_pkg(ws, args) -> None:
+def add_pkg(ws : WorkSpace, args) -> None:
     log.info("Adding package to workspace")
     ws.add_dependency(args.repo)
 
@@ -444,7 +316,7 @@ def update_dep(ws, args) -> None:
     log.info("'{}' now depends on '{}'".format(cwd_dirname, req_pkg.id()))
 
 
-def status(ws, args) -> None:
+def status(ws : WorkSpace, args) -> None:
     log.debug("Checking workspace status")
     if not ws.lock:
         log.info("{} is empty. Have you run `wit update`?".format(ws.LOCK))
@@ -539,3 +411,62 @@ def get_git_version():
 
 def get_dist_version():
     return __version__
+
+# import source package's wit-manifest.json information into destination package
+# if --include-repo is given, source package itself is included
+# if --not is given, do not update dependency
+def command_import(orgWs : WorkSpace, args):
+    argsDict = vars(args)
+    orignalLevel = log.getLevelName()
+    log.setLevel(logging.ERROR)
+
+    dest = (args.destination_pkg, None) if type(args.destination_pkg) == str else args.destination_pkg
+    (destination_repo, destination_rev) = dest
+    destination = os.path.basename(destination_repo).replace(".git","")
+
+    if orgWs.manifest.contains_dependency(destination):
+      if destination_rev != None and destination_rev.upper() != "HEAD":
+        log.error(f"""{destination_repo} is already included.
+        Do not spacify destionation revision
+        """)
+    else:
+      argsDict["repo"] = args.destination_pkg
+      add_pkg(orgWs, Namespace(**argsDict))
+      update(orgWs, args)
+
+    os.chdir(destination)
+    cwd = Path(os.getcwd()).resolve()
+    subprocess.run(["rm", "-rf", ".temp"], stdout=subprocess.DEVNULL)
+    ws = WorkSpace.create(".temp", parse_repo_path(args), args.jobs)
+    dependencies = [] if args.source_pkg is None else args.source_pkg
+    names = [ each.split("/")[-1].replace(".git","") for (each, _) in dependencies]
+    for dep in dependencies:
+        ws.add_dependency(dep)
+
+    log.setLevel(orignalLevel)
+    packages, errors = ws.resolve(download=True)
+    # print(packages)
+    if len(errors) != 0:
+        print_errors(errors)
+        sys.exit(1)
+    argsDict = vars(args)
+    manifest_path = cwd/GitRepo.PKG_DEPENDENCY_FILE
+    if manifest_path.exists():
+        manifest = Manifest.read_manifest(manifest_path)
+    else:
+        manifest = Manifest([])
+
+    # make sure the dependency is not already in the cwd's manifest
+    log.setLevel(orignalLevel)
+    for (key, value) in packages.items():
+        if key in names and not args.include_repo:
+            continue
+        argsDict["pkg"] = (value.source, value.revision)
+        argsDict["message"] = None
+        namespace = Namespace(**argsDict)
+        if manifest.contains_dependency(key):
+          if not args.overwrite:
+            update_dep(orgWs, namespace)
+        else:
+            add_dep(orgWs, namespace)
+    subprocess.run(["rm", "-rf", ".temp"], stdout=subprocess.DEVNULL)

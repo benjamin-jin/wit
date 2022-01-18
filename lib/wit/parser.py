@@ -148,7 +148,8 @@ import_parser = subparsers.add_parser(
         'import',
         help="import package",
         description="Import package's wit-manifest.json to target package")
-import_parser.add_argument('-a', '--source-pkg', metavar='repo[::revision]', action='append',
+import_parser.add_argument('-s', '--source-pkg', metavar='repo[::revision]', action='append',
                          type=parse_dependency_tag, help='add an initial package')
+import_parser.add_argument('-d', '--destination-pkg', metavar='repo[::revision]', type=parse_dependency_tag, help="define destination package")
 import_parser.add_argument('--include-repo', action="store_true", help="include top respository itself")
-import_parser.add_argument("--overwrite", action="store_true", help="overwrite if target package already contains found dependency")
+import_parser.add_argument("--not","--do-not-overwrite", dest="overwrite", action="store_true", help="overwrite if target package already contains found dependency")
