@@ -248,11 +248,13 @@ class WorkSpace:
         """ Resolve a dependency then add it to the wit-workspace.json """
         from .main import dependency_from_tag
         dep = dependency_from_tag(self.root, tag)
+        print(dep)
 
         if self.manifest.contains_dependency(dep.name):
             error("Manifest already contains package {}".format(dep.name))
 
         packages = {pkg.name: pkg for pkg in self.lock.packages}
+        print(packages)
         dep.load(packages, self.repo_paths, self.root, True)
         try:
             dep.package.revision = dep.resolved_rev()

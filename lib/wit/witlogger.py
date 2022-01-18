@@ -4,6 +4,7 @@ import logging
 import sys
 from typing import cast
 
+QUIET    = 20
 VERBOSE = 15
 TRACE = 5
 SPAM = 3
@@ -48,7 +49,7 @@ class WitLogger(logging.Logger):
         _handler = logging.StreamHandler(sys.stdout)
         _handler.setFormatter(WitFormatter())
         logging.basicConfig(level=logging.INFO, handlers=[_handler])
-
+        # logging.addLevelName(QUIET, "QUIET")
         logging.addLevelName(VERBOSE, 'VERBOSE')
         logging.addLevelName(TRACE, 'TRACE')
         logging.addLevelName(SPAM, 'SPAM')
@@ -67,6 +68,11 @@ class WitLogger(logging.Logger):
     def spam(self, msg, *args, **kwargs):
         if self.isEnabledFor(SPAM):
             self._log(SPAM, msg, args, **kwargs)
+
+    def quiet(self, msg, *args, **kwargs):
+        print("?")
+        if self.isEnabledFor(QUIET):
+            self._log(QUIET, msg, args, **kwargs)
 
     # for potential future -o flags (e.g. for `wit inspect --dot`)
     def output(self, msg):

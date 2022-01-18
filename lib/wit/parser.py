@@ -142,3 +142,13 @@ foreach_parser.add_argument('--continue-on-fail', action='store_true',
 # 'cmd' and 'args' eventually become one list, but this forces at least one input string
 foreach_parser.add_argument('cmd', help='command to run in each repository')
 foreach_parser.add_argument('args', nargs=argparse.REMAINDER, help='arguments for the command')
+
+# import parser
+import_parser = subparsers.add_parser(
+        'import',
+        help="import package",
+        description="Import package's wit-manifest.json to target package")
+import_parser.add_argument('-a', '--source-pkg', metavar='repo[::revision]', action='append',
+                         type=parse_dependency_tag, help='add an initial package')
+import_parser.add_argument('--include-repo', action="store_true", help="include top respository itself")
+import_parser.add_argument("--overwrite", action="store_true", help="overwrite if target package already contains found dependency")
