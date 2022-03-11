@@ -50,11 +50,11 @@ class GitRepo:
     """
     PKG_DEPENDENCY_FILE = "wit-manifest.json"
     SUBMODULE_FILE = ".gitmodules"
-    DO_SUBMODULE = True
+    __DO_SUBMODULE = True
 
     @classmethod
     def set_submodule(cls, flag  = True):
-      cls.DO_SUBMODULE = flag
+      cls.__DO_SUBMODULE = flag
 
     def __init__(self, name, wsroot: Path):
         self.name = name
@@ -270,7 +270,7 @@ class GitRepo:
         if proc.returncode:
             log.debug("No .gitmodules file found in repo [{}:{}]".format(revision, self.path))
             return []
-        if self.DO_SUBMODULE:
+        if self.__DO_SUBMODULE:
           log.debug("{}:{} does not have wit-manifest.json, "
                     "reading dependencies from .gitmodules instead"
                     .format(self.name, revision))
