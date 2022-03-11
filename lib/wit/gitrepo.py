@@ -50,6 +50,11 @@ class GitRepo:
     """
     PKG_DEPENDENCY_FILE = "wit-manifest.json"
     SUBMODULE_FILE = ".gitmodules"
+    DO_SUBMODULE = True
+
+    @classmethod
+    def set_submodule(cls, flag  = True):
+      cls.DO_SUBMODULE = flag
 
     def __init__(self, name, wsroot: Path):
         self.name = name
@@ -265,62 +270,65 @@ class GitRepo:
         if proc.returncode:
             log.debug("No .gitmodules file found in repo [{}:{}]".format(revision, self.path))
             return []
+        if self.DO_SUBMODULE:
+          log.debug("{}:{} does not have wit-manifest.json, "
+                    "reading dependencies from .gitmodules instead"
+                    .format(self.name, revision))
 
-        log.debug("{}:{} does not have wit-manifest.json, "
-                  "reading dependencies from .gitmodules instead"
-                  .format(self.name, revision))
+          # Use the 'git config' parser to read the submodule contents.
+          # Output is of the form:
+          #     submodule.$NAME.path $PATH
+          #     submodule.$NAME.url  $REMOTE
+          proc = self._git_command("config", "-f-", "--get-regex", r"submodule\..*",
+                                  input=proc.stdout)
+          self._git_check(proc)
 
-        # Use the 'git config' parser to read the submodule contents.
-        # Output is of the form:
-        #     submodule.$NAME.path $PATH
-        #     submodule.$NAME.url  $REMOTE
-        proc = self._git_command("config", "-f-", "--get-regex", r"submodule\..*",
-                                 input=proc.stdout)
-        self._git_check(proc)
+          paths_by_name = OrderedDict()  # type: OrderedDict
+          urls_by_name = {}
 
-        paths_by_name = OrderedDict()  # type: OrderedDict
-        urls_by_name = {}
+          path_r = re.compile(r'^submodule\.(.*)\.path (.*)$')
+          for line in proc.stdout.splitlines():
+              m = path_r.match(line)
+              if m:
+                  paths_by_name[m.group(1)] = m.group(2)
 
-        path_r = re.compile(r'^submodule\.(.*)\.path (.*)$')
-        for line in proc.stdout.splitlines():
-            m = path_r.match(line)
-            if m:
-                paths_by_name[m.group(1)] = m.group(2)
+          url_r = re.compile(r'^submodule\.(.*)\.url (.*)$')
+          for line in proc.stdout.splitlines():
+              m = url_r.match(line)
+              if m:
+                  urls_by_name[m.group(1)] = m.group(2)
 
-        url_r = re.compile(r'^submodule\.(.*)\.url (.*)$')
-        for line in proc.stdout.splitlines():
-            m = url_r.match(line)
-            if m:
-                urls_by_name[m.group(1)] = m.group(2)
+          if len(paths_by_name) != len(urls_by_name):
+              log.error("Error matching paths with urls in {}/{}"
+                        .format(self.name, GitRepo.SUBMODULE_FILE))
+              sys.exit(1)
 
-        if len(paths_by_name) != len(urls_by_name):
-            log.error("Error matching paths with urls in {}/{}"
-                      .format(self.name, GitRepo.SUBMODULE_FILE))
-            sys.exit(1)
+          submodules = []
+          for name_key, path in paths_by_name.items():
+              if self._should_ignore_submodule(name_key, proc.stdout):
+                  continue
 
-        submodules = []
-        for name_key, path in paths_by_name.items():
-            if self._should_ignore_submodule(name_key, proc.stdout):
-                continue
+              # We use the relative path within the repository to ask the git index
+              # for the pointer that's currently commited
+              submodule_ref = self._get_submodule_pointer(revision, path)
 
-            # We use the relative path within the repository to ask the git index
-            # for the pointer that's currently commited
-            submodule_ref = self._get_submodule_pointer(revision, path)
+              url = urls_by_name[name_key]
+              name = name_key
+              if "/" in name:
+                  # Wit only supports a 'flat' checkout pattern.
+                  # By default, git submodules uses the relative checkout path to name the submodule.
+                  # The user can add an explict name, but often do not.
+                  # So if the submodule happens to have a name that looks like a nested path,
+                  # use the the final path component in the remote url instead as the path-based names
+                  # as sometimes they're easy-to-clash names like docs/html.
+                  name = re.sub(r"\.git$", "", os.path.basename(url))
 
-            url = urls_by_name[name_key]
-            name = name_key
-            if "/" in name:
-                # Wit only supports a 'flat' checkout pattern.
-                # By default, git submodules uses the relative checkout path to name the submodule.
-                # The user can add an explict name, but often do not.
-                # So if the submodule happens to have a name that looks like a nested path,
-                # use the the final path component in the remote url instead as the path-based names
-                # as sometimes they're easy-to-clash names like docs/html.
-                name = re.sub(r"\.git$", "", os.path.basename(url))
+              submodules.append(RepoEntry(name, submodule_ref, url))
 
-            submodules.append(RepoEntry(name, submodule_ref, url))
-
-        return submodules
+          return submodules
+        else:
+          self._git_command("submodule update --init --recursive")
+          return []
 
     def _should_ignore_submodule(self, name, gitconfig):
         """
